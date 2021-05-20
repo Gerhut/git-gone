@@ -134,25 +134,40 @@ Report issues to <https://github.com/lunaryorn/git-gone>.",
     let repo = Repository::open_from_env()?;
 
     if matches.is_present("fetch") {
-        let mut command = Command::new("git");
-        command.arg("fetch").arg("--prune").arg("--all");
-        if !verbose {
-            command.arg("--quiet");
-        }
-        command
-            .spawn()
-            .and_then(|mut c| c.wait())
-            .and_then(|status| {
-                if status.success() {
-                    Ok(())
-                } else {
-                    use std::io::{Error, ErrorKind};
-                    Err(Error::new(
-                        ErrorKind::Other,
-                        "git fetch --prune --all failed",
-                    ))
+        if cfg!(feature = "fetch-native") {
+            let mut options = FetchOptions::new();
+            options.prune(FetchPrune::On);
+            for name in repo.remotes()?.iter().filter_map(|item| item) {
+                let mut remote = repo.find_remote(name)?;
+                for refspec in remote
+                    .fetch_refspecs()?
+                    .iter()
+                    .filter_map(|refspec| refspec)
+                {
+                    remote.fetch(&[refspec], Some(&mut options), None)?;
                 }
-            })?;
+            }
+        } else {
+            let mut command = Command::new("git");
+            command.arg("fetch").arg("--prune").arg("--all");
+            if !verbose {
+                command.arg("--quiet");
+            }
+            command
+                .spawn()
+                .and_then(|mut c| c.wait())
+                .and_then(|status| {
+                    if status.success() {
+                        Ok(())
+                    } else {
+                        use std::io::{Error, ErrorKind};
+                        Err(Error::new(
+                            ErrorKind::Other,
+                            "git fetch --prune --all failed",
+                        ))
+                    }
+                })?;
+        }
     }
 
     match matches.subcommand_name().unwrap_or("list") {

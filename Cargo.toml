@@ -21,3 +21,6 @@ version = "^0.13"
 # Specifically this also disables SSL and SSH support and thus removes library dependencies, which permits
 # a static musl build.
 default-features = false
+
+[features]
+native-fetch = ["git2/default"]
